@@ -1,0 +1,3 @@
+hello there!
+I am simple server sorry!
+Yes Node/Backend is going to be hard
