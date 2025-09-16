@@ -1,5 +1,4 @@
 // welcome to nodejs
-
 console.log("Hello Nodejs");
 
 import http from "node:http";
@@ -15,3 +14,9 @@ const server = http.createServer((req, res) => {
 server.listen(4080, "127.0.0.1", () =>
   console.log("listening at port ", server.address())
 );
+
+// console.log(__dirname);
+// console.log(__filename);
+
+//  returns the root dir
+console.log(process.cwd());
