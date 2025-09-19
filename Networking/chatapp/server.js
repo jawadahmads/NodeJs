@@ -20,11 +20,18 @@ const clients = [];
 // when ever the connection is made run the callback (callbacks are stored in eventloop)
 server.on("connection", (socket) => {
   let client_id = clients.length + 1;
+
   // just give an id to whom ever connect
   // so this is going to be a personal message
   socket.write(`id-${client_id}`);
 
   console.log(`new Connection of id :${client_id}`);
+
+  //   broadcast who ever joins
+
+  clients.map((client) => {
+    client.socket.write(`user joined : ${client_id}`);
+  });
 
   //   reads data from the connected client(socket) and send some data (buffer) to it
 
@@ -38,6 +45,14 @@ server.on("connection", (socket) => {
     // maping through each client we broadcast the message
     clients.map((sokObj) => {
       sokObj.socket.write(`> User ${id} : ${message}`);
+    });
+  });
+
+  //   on connection ended
+  // broad cast user left
+  socket.on("end", () => {
+    clients.map((client) => {
+      client.socket.write(`User ${client.id} Left`);
     });
   });
 
