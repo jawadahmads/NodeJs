@@ -1,64 +1,53 @@
-// creating file uploader in Node
-
 import net from "net";
-import fs from "fs/promises";
+import fs from "fs";
 
-// vars && ipv6 loopback address => localhost of ipv6
 const PORT = 8080;
-const HOST = "::1";
+const HOST = "::1"; // IPv6 loopback (localhost)
 
-const server = net.createServer(() => {});
+const server = net.createServer((socket) => {
+  console.log("New connection");
 
-let fileHandler;
-let file_stream;
-let file_name;
-server.on("connection", (socket) => {
-  console.log(`New Connection to the server`);
-  // socket is the client connected (socket) => duplex Stream
+  let file_stream;
+  let headerParsed = false;
+  let leftover = Buffer.alloc(0);
 
-  //   reading from the client(socket)
-  socket.on("data", async (data) => {
-    if (data.toString("utf-8").includes("fileName")) {
-      // we have the file name
-      let temp = data.toString("utf-8").split("^")[1].split("/");
-      file_name = temp[temp.length - 1];
-      console.log(`File_Name : ${file_name}`);
-    } else {
-      if (!fileHandler) {
-        socket.pause();
-        fileHandler = await fs.open(`./Storage/${file_name}`, "w");
-        file_stream = fileHandler.createWriteStream();
-        if (fileHandler) {
-          socket.resume();
-          file_stream.write(data);
+  socket.on("data", (chunk) => {
+    leftover = Buffer.concat([leftover, chunk]);
+
+    if (!headerParsed) {
+      const divider = leftover.indexOf("-------");
+
+      if (divider !== -1) {
+        // parse header
+        const file_name = leftover.subarray(10, divider).toString("utf8");
+        console.log("Receiving file:", file_name);
+
+        file_stream = fs.createWriteStream(`./Storage/${file_name}`);
+        headerParsed = true;
+
+        // write remaining after header
+        const rest = leftover.subarray(divider + 7);
+        if (rest.length) {
+          file_stream.write(rest);
         }
-      } else {
-        // data is the buffer
-        // lets handle draining
-
-        // handling buffer overflow
-        if (!file_stream.write(data)) {
-          // if return false pause reading
-          socket.pause();
-        }
+        leftover = Buffer.alloc(0);
       }
-
-      file_stream.on("drain", () => {
-        // after drained
-        socket.resume();
-      });
+    } else {
+      // after header, just keep writing chunks
+      if (!file_stream.write(leftover)) {
+        socket.pause(); // handle backpressure
+        file_stream.once("drain", () => socket.resume());
+      }
+      leftover = Buffer.alloc(0);
     }
   });
 
   socket.on("end", () => {
-    console.log(`Connection Ended`);
-    fileHandler.close();
-    fileHandler = undefined;
-    file_stream = undefined;
-    file_name = undefined;
+    console.log("Upload finished");
+    file_stream?.end();
   });
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Server Running at`, server.address());
+  console.log(`Server running at ${HOST}:${PORT}`);
 });
